@@ -35,7 +35,27 @@ def setup(email: str) -> None:
         client.login()
         client.garth.dump(tokenstore)
     except Exception as e:
+        msg = str(e).lower()
         print(f"Error: Authentication failed — {e}", file=sys.stderr)
+        if "no profile" in msg or "connectapi" in msg:
+            print(
+                "\nThis usually means Garmin's servers are temporarily blocking requests.\n"
+                "Try again in a few minutes. If it persists, double-check your password.",
+                file=sys.stderr,
+            )
+        elif "401" in msg or "unauthorized" in msg or "credentials" in msg:
+            print(
+                "\nDouble-check your email and password. If you have two-factor\n"
+                "authentication (2FA) enabled on your Garmin account, you may need\n"
+                "to disable it — the garminconnect library does not support 2FA.",
+                file=sys.stderr,
+            )
+        elif "cloudflare" in msg or "captcha" in msg or "403" in msg:
+            print(
+                "\nGarmin's Cloudflare protection may be blocking this request.\n"
+                "Wait a few minutes and try again.",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     print(f"Success! Tokens cached in {TOKEN_DIR}")
@@ -52,13 +72,31 @@ def authenticate() -> Garmin:
 
     try:
         client.login(tokenstore)
-    except Exception:
+    except FileNotFoundError:
         print(
-            "Error: No cached tokens found or tokens expired.\n"
+            "Error: No cached tokens found.\n"
             "Run setup first:\n\n"
             "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
             file=sys.stderr,
         )
+        sys.exit(1)
+    except Exception as e:
+        msg = str(e).lower()
+        if "no profile" in msg or "connectapi" in msg:
+            print(
+                "Error: Garmin's servers returned 'No profile'. This is usually\n"
+                "temporary — wait a few minutes and try again. If it persists,\n"
+                "re-run setup:\n\n"
+                "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"Error: Authentication failed — {e}\n"
+                "Your cached tokens may have expired. Re-run setup:\n\n"
+                "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     return client

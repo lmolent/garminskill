@@ -53,7 +53,10 @@ Sections are only included when data is available.
 
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/) (no pip install needed — dependencies are inline)
-- A Garmin Connect account
+  - macOS: `brew install uv`
+  - Linux/WSL: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+  - Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+- A Garmin Connect account (two-factor authentication must be disabled — see [Troubleshooting](#troubleshooting))
 
 ### One-time setup
 
@@ -96,6 +99,37 @@ Schedule the sync to run every morning so your data stays up to date automatical
 ```bash
 0 7 * * * uv run /path/to/garminskill/scripts/sync_garmin.py
 ```
+
+## Troubleshooting
+
+### "No profile from connectapi"
+
+This is the most common setup error. It usually means Garmin's servers are temporarily rate-limiting or blocking the request (via Cloudflare). It does **not** necessarily mean your password is wrong.
+
+1. **Wait a few minutes and try again.** This resolves it most of the time.
+2. **Double-check your password.** The error can also appear for wrong credentials — Garmin doesn't always return a clear "wrong password" message.
+3. **Check if Garmin Connect is down.** Try logging in at [connect.garmin.com](https://connect.garmin.com) in a browser.
+
+### Two-factor authentication (2FA)
+
+If your Garmin account has 2FA enabled, authentication will fail. The `garminconnect` library does not support 2FA/MFA flows. You'll need to disable 2FA on your Garmin account to use this skill:
+
+1. Log in to [connect.garmin.com](https://connect.garmin.com)
+2. Go to Account Settings → Security
+3. Disable two-step verification
+4. Re-run setup: `uv run scripts/sync_garmin.py --setup --email you@example.com`
+
+### Cloudflare / random auth failures
+
+This skill uses [cloudscraper](https://github.com/VeNoMouS/cloudscraper) to bypass Cloudflare protection on Garmin's SSO. Garmin periodically updates their anti-bot measures, which can cause temporary breakdowns. If authentication suddenly stops working after a period of stability:
+
+1. **Update dependencies:** `uv pip install --upgrade garminconnect cloudscraper`
+2. **Wait and retry.** Cloudflare blocks are often transient.
+3. **Check the [garminconnect issues page](https://github.com/cyberjunky/python-garminconnect/issues)** — others may be experiencing the same problem.
+
+### Tokens expired
+
+Cached tokens last about a year. When they expire, the sync will tell you to re-run setup. Just run the setup command again with your email — a new password prompt will appear and fresh tokens will be cached.
 
 ## Auth notes
 

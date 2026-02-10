@@ -57,18 +57,10 @@ Sections are only included when data is available.
 
 ### One-time setup
 
-Authenticate and cache OAuth tokens. This only needs to happen once (~1 year token validity).
-
-**Interactive** (terminal) — password is prompted via `getpass`, never echoed or stored:
+Authenticate and cache OAuth tokens. This only needs to happen once (~1 year token validity). The password is prompted interactively via `getpass` — never echoed to screen or stored in shell history.
 
 ```bash
 uv run scripts/sync_garmin.py --setup --email you@example.com
-```
-
-**Non-interactive** (agent/scripted) — pipe the password via stdin:
-
-```bash
-printf '%s\n' 'yourpassword' | uv run scripts/sync_garmin.py --setup --email you@example.com
 ```
 
 After setup succeeds, the password is no longer needed. All subsequent syncs use cached tokens only.
@@ -109,5 +101,5 @@ Schedule the sync to run every morning so your data stays up to date automatical
 
 The script uses [garminconnect](https://github.com/cyberjunky/python-garminconnect) with [cloudscraper](https://github.com/VeNoMouS/cloudscraper) to bypass Cloudflare protection on Garmin's SSO. Authentication is split into two phases:
 
-1. **Setup** (`--setup`): Run once to authenticate. In a terminal, `getpass` prompts for the password (never echoed or stored). In a non-interactive context (agent/script), the password can be piped via stdin. OAuth tokens are cached in `~/.garminconnect/` (~1 year validity). The password is used once and then discarded.
+1. **Setup** (`--setup`): Run once in a terminal to authenticate. `getpass` prompts for the password (never echoed to screen or stored in shell history). OAuth tokens are cached in `~/.garminconnect/` (~1 year validity). The password is used once and then discarded.
 2. **Sync** (default): Uses cached tokens only — no credentials needed. Token refresh is automatic (OAuth1 → OAuth2 exchange, no password required). If tokens expire or are revoked by Garmin, re-run setup.

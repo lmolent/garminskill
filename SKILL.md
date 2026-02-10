@@ -2,7 +2,7 @@
 name: garmin-connect
 description: Syncs daily health and fitness data from Garmin Connect into markdown files. Provides sleep, activity, heart rate, stress, body battery, HRV, SpO2, and weight data.
 homepage: https://github.com/freakyflow/garminskill
-metadata: {"clawdbot":{"emoji":"💪","requires":{"bins":["uv"]},"install":[{"id":"uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv via Homebrew"},{"id":"uv-sh","kind":"download","url":"https://astral.sh/uv/install.sh","bins":["uv"],"label":"Install uv via shell script","os":["linux"]}]}}
+metadata: {"clawdbot":{"emoji":"💪","requires":{"bins":["uv"]},"install":[{"id":"uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv via Homebrew"}]}}
 ---
 
 # Garmin Connect
@@ -13,19 +13,15 @@ This skill syncs your daily health data from Garmin Connect into readable markdo
 
 Authentication is required before the first sync. This only needs to happen once — tokens are cached for approximately one year.
 
-If the sync command fails with "No cached tokens found", ask the user for their Garmin Connect **email** and **password**, then run:
-
-```bash
-printf '%s\n' '<password>' | uv run {baseDir}/scripts/sync_garmin.py --setup --email <email>
-```
-
-On success you will see `Success! Tokens cached in ~/.garminconnect`. After that, **discard the password** — all future syncs use cached tokens only and no credentials are needed.
-
-Alternatively, the user can run setup directly in their terminal (password is prompted interactively via `getpass`, never echoed or stored):
+If the sync command fails with "No cached tokens found", tell the user to run the setup command in their terminal:
 
 ```bash
 uv run {baseDir}/scripts/sync_garmin.py --setup --email you@example.com
 ```
+
+The password is prompted interactively via `getpass` — it is never echoed to screen, stored in shell history, or passed as a command argument. On success the user will see `Success! Tokens cached in ~/.garminconnect`. After that, all syncs use cached tokens only — no credentials are needed.
+
+Do not ask the user for their password in chat and do not pass passwords as command-line arguments or via stdin piping, as these methods can expose credentials in process listings or conversation history.
 
 ## Syncing Data
 

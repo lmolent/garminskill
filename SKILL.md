@@ -2,12 +2,30 @@
 name: garmin-connect
 description: Syncs daily health and fitness data from Garmin Connect into markdown files. Provides sleep, activity, heart rate, stress, body battery, HRV, SpO2, and weight data.
 homepage: https://github.com/freakyflow/garminskill
-metadata: {"clawdbot":{"emoji":"💪","requires":{"bins":["uv"],"env":["GARMIN_EMAIL","GARMIN_PASSWORD"]},"install":[{"id":"uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv via Homebrew"},{"id":"uv-sh","kind":"download","url":"https://astral.sh/uv/install.sh","bins":["uv"],"label":"Install uv via shell script","os":["linux"]}]}}
+metadata: {"clawdbot":{"emoji":"💪","requires":{"bins":["uv"]},"install":[{"id":"uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv via Homebrew"},{"id":"uv-sh","kind":"download","url":"https://astral.sh/uv/install.sh","bins":["uv"],"label":"Install uv via shell script","os":["linux"]}]}}
 ---
 
 # Garmin Connect
 
 This skill syncs your daily health data from Garmin Connect into readable markdown files.
+
+## Setup
+
+Authentication is required before the first sync. This only needs to happen once — tokens are cached for approximately one year.
+
+If the sync command fails with "No cached tokens found", ask the user for their Garmin Connect **email** and **password**, then run:
+
+```bash
+printf '%s\n' '<password>' | uv run {baseDir}/scripts/sync_garmin.py --setup --email <email>
+```
+
+On success you will see `Success! Tokens cached in ~/.garminconnect`. After that, **discard the password** — all future syncs use cached tokens only and no credentials are needed.
+
+Alternatively, the user can run setup directly in their terminal (password is prompted interactively via `getpass`, never echoed or stored):
+
+```bash
+uv run {baseDir}/scripts/sync_garmin.py --setup --email you@example.com
+```
 
 ## Syncing Data
 
@@ -41,8 +59,8 @@ This skill uses [uv](https://docs.astral.sh/uv/) to run the sync script. `uv` is
 
 ## Credentials
 
-Garmin Connect does not offer a public OAuth API. The `garminconnect` library authenticates with your email and password once, then caches OAuth tokens locally in `~/.garminconnect/` for approximately one year. Your credentials are only used for the initial login and are never stored or transmitted beyond Garmin's SSO endpoint.
+Garmin Connect does not offer a public OAuth API, so a one-time email/password login is required. During setup, the password is used once to obtain OAuth tokens, then discarded. The tokens are cached locally in `~/.garminconnect/` for approximately one year. At runtime, only the cached tokens are used — no email or password is needed. If tokens expire, re-run the setup command.
 
 ## Cron Setup
 
-Schedule the sync script to run every morning using OpenClaw's `cron` tool so your health data stays up to date automatically.
+Schedule the sync script to run every morning using OpenClaw's `cron` tool so your health data stays up to date automatically. No environment variables or credentials are needed — the sync uses cached tokens from the one-time setup.

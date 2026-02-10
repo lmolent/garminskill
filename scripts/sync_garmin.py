@@ -5,9 +5,9 @@
 """Sync daily health data from Garmin Connect into markdown files."""
 
 import argparse
-import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+from getpass import getpass
 from pathlib import Path
 
 import cloudscraper
@@ -18,10 +18,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 TOKEN_DIR = Path.home() / ".garminconnect"
 
 
-def authenticate() -> Garmin:
-    """Authenticate with Garmin Connect, using cached tokens when available."""
-    email = os.environ.get("GARMIN_EMAIL")
-    password = os.environ.get("GARMIN_PASSWORD")
+def setup(email: str) -> None:
+    """One-time interactive setup: authenticate with email/password and cache tokens."""
+    password = getpass("Garmin Connect password: ")
+    if not password:
+        print("Error: Password cannot be empty.", file=sys.stderr)
+        sys.exit(1)
 
     client = Garmin(email, password)
     client.garth.sess = cloudscraper.create_scraper()
@@ -30,20 +32,34 @@ def authenticate() -> Garmin:
     tokenstore = str(TOKEN_DIR)
 
     try:
+        client.login()
+        client.garth.dump(tokenstore)
+    except Exception as e:
+        print(f"Error: Authentication failed — {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Success! Tokens cached in {TOKEN_DIR}")
+    print("You can now run the sync command without credentials.")
+
+
+def authenticate() -> Garmin:
+    """Authenticate with Garmin Connect using cached tokens only."""
+    client = Garmin()
+    client.garth.sess = cloudscraper.create_scraper()
+
+    TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+    tokenstore = str(TOKEN_DIR)
+
+    try:
         client.login(tokenstore)
     except Exception:
-        if not email or not password:
-            print(
-                "Error: GARMIN_EMAIL and GARMIN_PASSWORD env vars are required for first login.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        try:
-            client.login()
-            client.garth.dump(tokenstore)
-        except Exception as e:
-            print(f"Error: Authentication failed — {e}", file=sys.stderr)
-            sys.exit(1)
+        print(
+            "Error: No cached tokens found or tokens expired.\n"
+            "Run setup first:\n\n"
+            "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     return client
 
@@ -496,6 +512,8 @@ def sync_day(client: Garmin, day: date, output_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sync Garmin Connect health data to markdown.")
+    parser.add_argument("--setup", action="store_true", help="One-time setup: authenticate and cache tokens.")
+    parser.add_argument("--email", type=str, help="Garmin Connect email (used with --setup).")
     parser.add_argument("--date", type=str, help="Specific date to sync (YYYY-MM-DD). Default: today.")
     parser.add_argument("--days", type=int, help="Sync the last N days.")
     parser.add_argument(
@@ -505,6 +523,13 @@ def main() -> None:
         help="Output directory for markdown files (relative to skill base dir).",
     )
     args = parser.parse_args()
+
+    if args.setup:
+        if not args.email:
+            print("Error: --email is required with --setup.", file=sys.stderr)
+            sys.exit(1)
+        setup(args.email)
+        return
 
     # Always resolve output-dir relative to the skill's base directory, not CWD
     output_dir = Path(args.output_dir)

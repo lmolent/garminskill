@@ -55,17 +55,28 @@ Sections are only included when data is available.
 - [uv](https://docs.astral.sh/uv/) (no pip install needed — dependencies are inline)
 - A Garmin Connect account
 
-### Environment variables
+### One-time setup
+
+Authenticate and cache OAuth tokens. This only needs to happen once (~1 year token validity).
+
+**Interactive** (terminal) — password is prompted via `getpass`, never echoed or stored:
 
 ```bash
-export GARMIN_EMAIL="you@example.com"
-export GARMIN_PASSWORD="yourpassword"
+uv run scripts/sync_garmin.py --setup --email you@example.com
 ```
+
+**Non-interactive** (agent/scripted) — pipe the password via stdin:
+
+```bash
+printf '%s\n' 'yourpassword' | uv run scripts/sync_garmin.py --setup --email you@example.com
+```
+
+After setup succeeds, the password is no longer needed. All subsequent syncs use cached tokens only.
 
 ### Run it
 
 ```bash
-# Sync today
+# Sync today (no credentials needed — uses cached tokens)
 uv run scripts/sync_garmin.py
 
 # Sync a specific date
@@ -73,9 +84,12 @@ uv run scripts/sync_garmin.py --date 2025-01-26
 
 # Sync the last 7 days
 uv run scripts/sync_garmin.py --days 7
+
+# Custom output directory (default: health/)
+uv run scripts/sync_garmin.py --output-dir my-data
 ```
 
-Markdown files are written to `health/YYYY-MM-DD.md`.
+Markdown files are written to `health/YYYY-MM-DD.md` by default (relative to the skill's base directory).
 
 ### Install as an OpenClaw skill
 
@@ -85,12 +99,15 @@ ln -s /path/to/garminskill ~/.openclaw/skills/garmin-connect
 
 ### Cron
 
-Schedule the sync to run every morning so your data stays up to date automatically. OpenClaw's `cron` tool can handle this, or use a system crontab:
+Schedule the sync to run every morning so your data stays up to date automatically. No credentials needed — the sync uses cached tokens from the one-time setup. OpenClaw's `cron` tool can handle this, or use a system crontab:
 
 ```bash
-0 7 * * * GARMIN_EMAIL="..." GARMIN_PASSWORD="..." uv run /path/to/garminskill/scripts/sync_garmin.py
+0 7 * * * uv run /path/to/garminskill/scripts/sync_garmin.py
 ```
 
 ## Auth notes
 
-The script uses [garminconnect](https://github.com/cyberjunky/python-garminconnect) with [cloudscraper](https://github.com/VeNoMouS/cloudscraper) to bypass Cloudflare protection on Garmin's SSO. OAuth tokens are cached in `~/.garminconnect/` and are valid for ~1 year, so credentials are only needed on first login.
+The script uses [garminconnect](https://github.com/cyberjunky/python-garminconnect) with [cloudscraper](https://github.com/VeNoMouS/cloudscraper) to bypass Cloudflare protection on Garmin's SSO. Authentication is split into two phases:
+
+1. **Setup** (`--setup`): Run once to authenticate. In a terminal, `getpass` prompts for the password (never echoed or stored). In a non-interactive context (agent/script), the password can be piped via stdin. OAuth tokens are cached in `~/.garminconnect/` (~1 year validity). The password is used once and then discarded.
+2. **Sync** (default): Uses cached tokens only — no credentials needed. Token refresh is automatic (OAuth1 → OAuth2 exchange, no password required). If tokens expire or are revoked by Garmin, re-run setup.

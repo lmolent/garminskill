@@ -4,9 +4,10 @@ An [OpenClaw](https://openclaw.ai) skill that syncs your daily health data from 
 
 ## What it syncs
 
-- **Sleep** — duration, stages (deep/light/REM/awake), sleep score
+- **Sleep** — duration, stages (deep/light/REM/awake), sleep score, sleep need, sleep factors (stress, recovery, etc.)
+- **Lifestyle** — alcohol, caffeine, late meal, illness (if logged)
 - **Body** — steps, calories, distance, floors
-- **Heart** — resting HR, max HR, HRV
+- **Heart** — resting HR, max HR, weekly vs. last night HRV
 - **Body Battery & SpO2**
 - **Stress** — average level
 - **Training Readiness** — score and level
@@ -24,11 +25,18 @@ An [OpenClaw](https://openclaw.ai) skill that syncs your daily health data from 
 ## Sleep: 8h 39m (Good)
 Deep: 1h 50m | Light: 4h 30m | REM: 2h 19m | Awake: 0h 54m
 Sleep Score: 85
+Sleep Need: 8h 00m
+Sleep Factors: Sleep Duration: Good | Stress: Fair | Recovery: Good
+
+## Lifestyle
+- Alcohol: 1 drink
+- Caffeine: 2 cups
+- Late Meal: Yes
 
 ## Body: 9,720 steps | 2,317 cal
 Distance: 8.0 km | Floors: 42
 Resting HR: 37 bpm | Max HR: 111 bpm
-HRV: 68 ms
+Weekly HRV Avg: 68 ms | Last Night HRV Avg: 72 ms
 SpO2: 94.0%
 
 ## Training Readiness: 100 (Prime) — Ready To Go
@@ -41,7 +49,7 @@ SpO2: 94.0%
 Moderate: 69 | Vigorous: 158 | Goal: 150
 
 ## Activities
-- **5K Run** — 28:15, 5.0 km, 320 cal
+- **5K Run** (18:12) — 28:15, 5.0 km, 320 cal
   Avg HR 155 / Max 172 | Elevation: +45m | Pace: 5:39/km | Cadence: 168 spm | Training Effect: 3.2 aerobic | VO2 Max: 50
 ```
 
@@ -73,6 +81,9 @@ After setup succeeds, the password is no longer needed. All subsequent syncs use
 ```bash
 # Sync today (no credentials needed — uses cached tokens)
 uv run scripts/sync_garmin.py
+
+# Sync today with verbose logging (shows raw data and fetch errors)
+uv run scripts/sync_garmin.py --verbose
 
 # Sync a specific date
 uv run scripts/sync_garmin.py --date 2025-01-26

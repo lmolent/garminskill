@@ -212,6 +212,59 @@ def fetch_sleep(client: Garmin, day: str) -> str | None:
     return "\n".join(lines)
 
 
+def fetch_lifestyle(client: Garmin, day: str) -> str | None:
+    """Fetch and format lifestyle logging data (Alcohol, Caffeine, Late Meal, Illness, etc.)."""
+    try:
+        # get_lifestyle_logging_data was added in garminconnect 0.2.35
+        data = client.get_lifestyle_logging_data(day)
+    except Exception as e:
+        if VERBOSE:
+            print(f"    [verbose] Lifestyle logging fetch failed: {e}", file=sys.stderr)
+        return None
+
+    if VERBOSE:
+        import json
+        print(f"    [verbose] Raw Lifestyle Data for {day}: {json.dumps(data, indent=2)}", file=sys.stderr)
+
+    if not data:
+        return None
+
+    # Lifestyle data is in dailyLogsReport
+    logs = data.get("dailyLogsReport", [])
+    if not logs:
+        return None
+
+    lines = ["## Lifestyle"]
+    for log in logs:
+        # Only include things that were logged as "YES"
+        if log.get("logStatus") != "YES":
+            continue
+
+        name = log.get("name") or str(log.get("behaviourId", ""))
+        
+        # Check for amounts in details
+        details = log.get("details", [])
+        detail_strs = []
+        for d in details:
+            amount = d.get("amount")
+            sub_type = d.get("subTypeName")
+            if amount is not None:
+                if sub_type:
+                    detail_strs.append(f"{amount} {sub_type.lower()}")
+                else:
+                    detail_strs.append(f"{amount}")
+        
+        line = f"- {name}"
+        if detail_strs:
+            line += f": {', '.join(detail_strs)}"
+        lines.append(line)
+
+    if len(lines) == 1:
+        return None
+
+    return "\n".join(lines)
+
+
 def fetch_body(client: Garmin, day: str) -> str | None:
     """Fetch and format body/activity summary data."""
     parts = []
@@ -583,6 +636,10 @@ def sync_day(client: Garmin, day: date, output_dir: Path) -> None:
     sleep = fetch_sleep(client, day_str)
     if sleep:
         sections.append(sleep)
+
+    lifestyle = fetch_lifestyle(client, day_str)
+    if lifestyle:
+        sections.append(lifestyle)
 
     body = fetch_body(client, day_str)
     if body:

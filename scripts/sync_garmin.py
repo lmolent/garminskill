@@ -84,7 +84,7 @@ def authenticate() -> Garmin:
     tokenstore = str(TOKEN_DIR)
 
     last_exc: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             client.login(tokenstore)
             return client
@@ -98,8 +98,8 @@ def authenticate() -> Garmin:
             sys.exit(1)
         except Exception as e:
             last_exc = e
-            if attempt < 2 and "no profile" in str(e).lower():
-                time.sleep(2**attempt)
+            if attempt < 4 and "no profile" in str(e).lower():
+                time.sleep(2 * (attempt + 1))
                 continue
             break
 

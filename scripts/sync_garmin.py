@@ -151,6 +151,10 @@ def fetch_sleep(client: Garmin, day: str) -> str | None:
             print(f"    [verbose] Sleep fetch failed: {e}", file=sys.stderr)
         return None
 
+    if VERBOSE:
+        import json
+        print(f"    [verbose] Raw Sleep Data for {day}: {json.dumps(data, indent=2)}", file=sys.stderr)
+
     daily = data.get("dailySleepDTO", {})
     if not daily or not daily.get("sleepTimeSeconds"):
         return None

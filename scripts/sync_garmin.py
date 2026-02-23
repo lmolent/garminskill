@@ -5,6 +5,7 @@
 """Sync daily health data from Garmin Connect into markdown files."""
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -17,13 +18,30 @@ from garminconnect import Garmin
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-TOKEN_DIR = Path.home() / ".garminconnect"
+DEFAULT_TOKEN_DIR = Path.home() / ".garminconnect"
 VERBOSE = False
 
 
-def setup(email: str) -> None:
+def get_token_dir(email: str | None = None, arg_token_dir: str | None = None) -> Path:
+    """Determine the token directory based on arguments, environment, or default."""
+    if arg_token_dir:
+        return Path(arg_token_dir)
+    
+    env_dir = os.getenv("GARMIN_TOKEN_DIR")
+    if env_dir:
+        return Path(env_dir)
+    
+    if email:
+        # Sanitize email for use as a directory name
+        safe_email = re.sub(r"[^a-zA-Z0-9._-]", "_", email)
+        return DEFAULT_TOKEN_DIR / safe_email
+    
+    return DEFAULT_TOKEN_DIR
+
+
+def setup(email: str, token_dir: Path) -> None:
     """One-time interactive setup: authenticate with email/password and cache tokens."""
-    password = getpass("Garmin Connect password: ")
+    password = getpass(f"Garmin Connect password for {email}: ")
     if not password:
         print("Error: Password cannot be empty.", file=sys.stderr)
         sys.exit(1)
@@ -31,8 +49,8 @@ def setup(email: str) -> None:
     client = Garmin(email, password)
     client.garth.sess = cloudscraper.create_scraper()
 
-    TOKEN_DIR.mkdir(parents=True, exist_ok=True)
-    tokenstore = str(TOKEN_DIR)
+    token_dir.mkdir(parents=True, exist_ok=True)
+    tokenstore = str(token_dir)
 
     last_exc: Exception | None = None
     for attempt in range(3):
@@ -72,17 +90,16 @@ def setup(email: str) -> None:
             )
         sys.exit(1)
 
-    print(f"Success! Tokens cached in {TOKEN_DIR}")
+    print(f"Success! Tokens cached in {token_dir}")
     print("You can now run the sync command without credentials.")
 
 
-def authenticate() -> Garmin:
+def authenticate(token_dir: Path, email: str | None = None) -> Garmin:
     """Authenticate with Garmin Connect using cached tokens only."""
     client = Garmin()
     client.garth.sess = cloudscraper.create_scraper()
 
-    TOKEN_DIR.mkdir(parents=True, exist_ok=True)
-    tokenstore = str(TOKEN_DIR)
+    tokenstore = str(token_dir)
 
     last_exc: Exception | None = None
     for attempt in range(5):
@@ -90,10 +107,14 @@ def authenticate() -> Garmin:
             client.login(tokenstore)
             return client
         except FileNotFoundError:
+            setup_cmd = f"uv run scripts/sync_garmin.py --setup --email {email or 'you@example.com'}"
+            if token_dir != DEFAULT_TOKEN_DIR and not email:
+                 setup_cmd += f" --token-dir {token_dir}"
+            
             print(
-                "Error: No cached tokens found.\n"
-                "Run setup first:\n\n"
-                "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
+                f"Error: No cached tokens found in {token_dir}\n"
+                "To fix this, the user must run the setup command in their terminal:\n\n"
+                f"  {setup_cmd}\n",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -105,19 +126,30 @@ def authenticate() -> Garmin:
             break
 
     msg = str(last_exc).lower()
+    setup_cmd = f"uv run scripts/sync_garmin.py --setup --email {email or 'you@example.com'}"
+    if token_dir != DEFAULT_TOKEN_DIR and not email:
+         setup_cmd += f" --token-dir {token_dir}"
+
     if "no profile" in msg or "connectapi" in msg:
         print(
             "Error: Garmin's servers returned 'No profile'. This is usually\n"
             "temporary — wait a few minutes and try again. If it persists,\n"
             "re-run setup:\n\n"
-            "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
+            f"  {setup_cmd}\n",
+            file=sys.stderr,
+        )
+    elif "401" in msg or "unauthorized" in msg or "credentials" in msg:
+        print(
+            "Error: Authentication failed (Unauthorized). Your cached tokens\n"
+            "may have expired or been revoked. Re-run setup:\n\n"
+            f"  {setup_cmd}\n",
             file=sys.stderr,
         )
     else:
         print(
             f"Error: Authentication failed — {last_exc}\n"
-            "Your cached tokens may have expired. Re-run setup:\n\n"
-            "  uv run scripts/sync_garmin.py --setup --email you@example.com\n",
+            "Your cached tokens may be invalid. Re-run setup:\n\n"
+            f"  {setup_cmd}\n",
             file=sys.stderr,
         )
     sys.exit(1)
@@ -673,7 +705,7 @@ def fetch_activities(client: Garmin, day: str) -> str | None:
 def sync_day(client: Garmin, day: date, output_dir: Path) -> None:
     """Sync a single day's data and write the markdown file."""
     day_str = day.isoformat()
-    display_date = day.strftime("%B %-d, %Y")
+    display_date = day.strftime("%A, %B %-d, %Y")
 
     sections = [f"# Health — {display_date}"]
 
@@ -726,7 +758,7 @@ def sync_day(client: Garmin, day: date, output_dir: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sync Garmin Connect health data to markdown.")
     parser.add_argument("--setup", action="store_true", help="One-time setup: authenticate and cache tokens.")
-    parser.add_argument("--email", type=str, help="Garmin Connect email (used with --setup).")
+    parser.add_argument("--email", type=str, help="Garmin Connect email.")
     parser.add_argument("--date", type=str, help="Specific date to sync (YYYY-MM-DD). Default: today.")
     parser.add_argument("--days", type=int, help="Sync the last N days.")
     parser.add_argument("--verbose", action="store_true", help="Show detailed error info for failed data fetches.")
@@ -736,16 +768,23 @@ def main() -> None:
         default="health",
         help="Output directory for markdown files (relative to skill base dir).",
     )
+    parser.add_argument(
+        "--token-dir",
+        type=str,
+        help="Custom directory for OAuth tokens (overrides GARMIN_TOKEN_DIR and default).",
+    )
     args = parser.parse_args()
 
     global VERBOSE
     VERBOSE = args.verbose
 
+    token_dir = get_token_dir(email=args.email, arg_token_dir=args.token_dir)
+
     if args.setup:
         if not args.email:
             print("Error: --email is required with --setup.", file=sys.stderr)
             sys.exit(1)
-        setup(args.email)
+        setup(args.email, token_dir)
         return
 
     # Always resolve output-dir relative to the skill's base directory, not CWD
@@ -766,8 +805,8 @@ def main() -> None:
     else:
         days = [date.today()]
 
-    print("Authenticating with Garmin Connect...")
-    client = authenticate()
+    print(f"Authenticating with Garmin Connect (tokens: {token_dir})...")
+    client = authenticate(token_dir, email=args.email)
     print(f"Syncing {len(days)} day(s)...")
 
     for day in sorted(days):

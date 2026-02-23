@@ -74,15 +74,21 @@ Authenticate and cache OAuth tokens. This only needs to happen once (~1 year tok
 uv run scripts/sync_garmin.py --setup --email you@example.com
 ```
 
-After setup succeeds, the password is no longer needed. All subsequent syncs use cached tokens only.
+If you use multiple Garmin accounts, providing the `--email` flag will store tokens in a separate subdirectory (e.g., `~/.garminconnect/you_example_com/`).
 
 ### Run it
 
 ```bash
-# Sync today (no credentials needed — uses cached tokens)
+# Sync today (uses default account)
 uv run scripts/sync_garmin.py
 
-# Sync today with verbose logging (shows raw data and fetch errors)
+# Sync today for a specific account
+uv run scripts/sync_garmin.py --email you@example.com
+
+# Custom token directory via environment variable
+GARMIN_TOKEN_DIR=/path/to/tokens uv run scripts/sync_garmin.py
+
+# Sync today with verbose logging
 uv run scripts/sync_garmin.py --verbose
 
 # Sync a specific date
@@ -146,5 +152,5 @@ Cached tokens last about a year. When they expire, the sync will tell you to re-
 
 The script uses [garminconnect](https://github.com/cyberjunky/python-garminconnect) with [cloudscraper](https://github.com/VeNoMouS/cloudscraper) to bypass Cloudflare protection on Garmin's SSO. Authentication is split into two phases:
 
-1. **Setup** (`--setup`): Run once in a terminal to authenticate. `getpass` prompts for the password (never echoed to screen or stored in shell history). OAuth tokens are cached in `~/.garminconnect/` (~1 year validity). The password is used once and then discarded.
-2. **Sync** (default): Uses cached tokens only — no credentials needed. Token refresh is automatic (OAuth1 → OAuth2 exchange, no password required). If tokens expire or are revoked by Garmin, re-run setup.
+1. **Setup** (`--setup`): Run once in a terminal to authenticate. `getpass` prompts for the password (never echoed to screen or stored in shell history). OAuth tokens are cached in `~/.garminconnect/` (~1 year validity). Providing `--email` stores tokens in an account-specific subdirectory for multi-account support. The password is used once and then discarded.
+2. **Sync** (default): Uses cached tokens only — no credentials needed. Token refresh is automatic (OAuth1 → OAuth2 exchange, no password required). Use `--email` to select the correct account's tokens if multiple are configured. If tokens expire or are revoked by Garmin, re-run setup.

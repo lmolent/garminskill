@@ -27,10 +27,16 @@ Do not ask the user for their password in chat and do not pass passwords as comm
 
 ## Syncing Data
 
-Sync today's data:
+Sync today's data (default account):
 
 ```bash
 uv run {baseDir}/scripts/sync_garmin.py
+```
+
+Sync for a specific account (if multiple accounts are setup):
+
+```bash
+uv run {baseDir}/scripts/sync_garmin.py --email you@example.com
 ```
 
 Sync a specific date:
@@ -57,11 +63,18 @@ This skill uses [uv](https://docs.astral.sh/uv/) to run the sync script. `uv` is
 
 ## Credentials & Stored Data
 
-Garmin Connect does not offer a public OAuth API, so a one-time email/password login is required. During setup, the password is used once to obtain OAuth tokens, then discarded. The tokens are cached locally in `~/.garminconnect/` for approximately one year. At runtime, only the cached tokens are used — no email or password is needed. If tokens expire, re-run the setup command.
+Garmin Connect does not offer a public OAuth API, so a one-time email/password login is required. During setup, the password is used once to obtain OAuth tokens, then discarded.
+
+**Token Isolation & Multi-Account Support:**
+
+- By default, tokens are cached in `~/.garminconnect/`.
+- If `--email` is provided, tokens are stored in `~/.garminconnect/{email}/`. This allows multiple Garmin accounts to be used on the same system.
+- You can override the base token directory by setting the `GARMIN_TOKEN_DIR` environment variable. This is useful for isolating data between different sub-agents or projects.
+- At runtime, only the cached tokens are used — no email or password is needed (unless using `--email` to select a specific account).
 
 **Paths written by this skill:**
 
-- `~/.garminconnect/` — cached OAuth tokens (sensitive; grants access to the user's Garmin account)
+- `~/.garminconnect/` — default cached OAuth tokens (sensitive; grants access to the user's Garmin account)
 - `{baseDir}/health/` — daily health markdown files (contains personal health data)
 
 ## Cron Setup
